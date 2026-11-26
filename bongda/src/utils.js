@@ -1,0 +1,119 @@
+import { TEAMS, POINTS, MAX_GOALS } from './data';
+
+export const getTeamName = (id) => {
+  const team = TEAMS.find((t) => t.id === Number(id));
+  return team ? team.name : '';
+};
+
+export const getResult = (match) => {
+  if (match.homeGoals > match.awayGoals) return 'home';
+  if (match.homeGoals < match.awayGoals) return 'away';
+  return 'draw';
+};
+
+export const isValidGoals = (n) => {
+  return Number.isInteger(n) && n >= 0 && n <= MAX_GOALS;
+};
+
+export const calcStandings = (matches) => {
+  const table = TEAMS.map((team) => ({
+    id: team.id,
+    name: team.name,
+    played: 0,
+    won: 0,
+    drawn: 0,
+    lost: 0,
+    gf: 0,
+    ga: 0,
+    diff: 0,
+    points: 0,
+  }));
+
+  const mapById = new Map(table.map((row) => [row.id, row]));
+
+  matches.forEach((m) => {
+    const home = mapById.get(m.home);
+    const away = mapById.get(m.away);
+    if (!home || !away) return;
+
+    home.played += 1;
+    away.played += 1;
+    home.gf += m.homeGoals;
+    home.ga += m.awayGoals;
+    away.gf += m.awayGoals;
+    away.ga += m.homeGoals;
+
+    const result = getResult(m);
+    if (result === 'home') {
+      home.won += 1;
+      home.points += POINTS.win;
+      away.lost += 1;
+      away.points += POINTS.loss;
+    } else if (result === 'away') {
+      away.won += 1;
+      away.points += POINTS.win;
+      home.lost += 1;
+      home.points += POINTS.loss;
+    } else {
+      home.drawn += 1;
+      home.points += POINTS.draw;
+      away.drawn += 1;
+      away.points += POINTS.draw;
+    }
+  });
+
+  table.forEach((row) => {
+    row.diff = row.gf - row.ga;
+  });
+
+  return [...table].sort((a, b) => {
+    if (b.points !== a.points) return b.points - a.points;
+    if (b.diff !== a.diff) return b.diff - a.diff;
+    if (b.gf !== a.gf) return b.gf - a.gf;
+    return a.name.localeCompare(b.name, 'vi');
+  });
+};
+
+export const calcMatchStats = (matches) => {
+  const counts = { home: 0, draw: 0, away: 0 };
+  let goals = 0;
+
+  matches.forEach((m) => {
+    goals += m.homeGoals + m.awayGoals;
+    const res = getResult(m);
+    counts[res] += 1;
+  });
+
+  const count = matches.length;
+  const average = count === 0 ? '0.00' : (Math.round((goals / count) * 100) / 100).toFixed(2);
+
+  return { count, goals, average, counts };
+};
+export const calcNeeded = (standings, teamId, target, remaining) => {
+  const team = standings.find((t) => t.id === Number(teamId));
+  const targetNum = Number(target);
+  const remNum = Number(remaining);
+
+  if (
+    !team ||
+    target === '' ||
+    remaining === '' ||
+    !Number.isInteger(targetNum) ||
+    targetNum < 0 ||
+    !Number.isInteger(remNum) ||
+    remNum < 1
+  ) {
+    return 'Hãy chọn đội, nhập số điểm mục tiêu (từ 0) và số trận còn lại (từ 1)';
+  }
+
+  const need = targetNum - team.points;
+  if (need <= 0) {
+    return 'Đội đã đạt mục tiêu';
+  }
+  if (need > 3 * remNum) {
+    return 'Không thể đạt mục tiêu này';
+  }
+
+  const minWins = Math.max(0, Math.ceil((need - remNum) / 2));
+  return `Cần thêm ${need} điểm ở ${remNum} trận còn lại, tối thiểu ${minWins} trận thắng`;
+};
